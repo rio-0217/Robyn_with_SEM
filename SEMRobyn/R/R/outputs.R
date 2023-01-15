@@ -77,7 +77,7 @@ robyn_outputs <- function(InputCollect, OutputModels,
   }
   pareto_results <- robyn_pareto(
     InputCollect, OutputModels,
-    pareto_fronts = "auto",
+    pareto_fronts = pareto_fronts,
     calibration_constraint = calibration_constraint,
     quiet = quiet,
     calibrated = calibrated,
@@ -85,6 +85,18 @@ robyn_outputs <- function(InputCollect, OutputModels,
   )
   pareto_fronts <- pareto_results$pareto_fronts
   allSolutions <- pareto_results$pareto_solutions
+
+  # Reduce the size of xDecompVec with only pareto-front models and create solID
+  OutputModels[names(OutputModels) %in% paste0("trial", 1:OutputModels$trials)] <- lapply(
+    OutputModels[names(OutputModels) %in% paste0("trial", 1:OutputModels$trials)],
+    function(x) {
+      mutate(x$resultCollect$xDecompVec,
+        solID = paste(.data$trial, .data$iterNG, .data$iterPar, sep = "_")
+      ) %>%
+        filter(.data$solID %in% allSolutions) %>%
+        select(-.data$iterNG, -.data$iterPar)
+    }
+  )
 
   #####################################
   #### Gather the results into output object
@@ -94,7 +106,8 @@ robyn_outputs <- function(InputCollect, OutputModels,
     resultHypParam = pareto_results$resultHypParam,
     xDecompAgg = pareto_results$xDecompAgg,
     resultCalibration = pareto_results$resultCalibration,
-    plotDataCollect = pareto_results$plotDataCollect
+    plotDataCollect = pareto_results$plotDataCollect,
+    df_caov_pct = pareto_results$df_caov_pct_all
   )
 
   # Set folder to save outputs: legacy plot_folder_sub
@@ -103,7 +116,7 @@ robyn_outputs <- function(InputCollect, OutputModels,
       "refreshDepth" %in% names(InputCollect),
       InputCollect$refreshDepth,
       ifelse("refreshCounter" %in% names(InputCollect),
-             InputCollect$refreshCounter, 0
+        InputCollect$refreshCounter, 0
       )
     )
     folder_var <- ifelse(!as.integer(depth) > 0, "init", paste0("rf", depth))
@@ -159,10 +172,18 @@ robyn_outputs <- function(InputCollect, OutputModels,
       OutputCollect$xDecompAgg,
       select(clusterCollect$data, .data$solID, .data$cluster, .data$top_sol),
       by = "solID"
-    ) %>% left_join(
-      select(clusterCollect$df_cluster_ci, .data$rn, .data$cluster, .data$boot_mean, .data$boot_se, .data$ci_low, .data$ci_up, .data$rn),
-      by = c("rn", "cluster")
-    )
+    ) %>%
+      left_join(
+        select(
+          clusterCollect$df_cluster_ci, .data$rn, .data$cluster, .data$boot_mean,
+          .data$boot_se, .data$ci_low, .data$ci_up, .data$rn
+        ),
+        by = c("rn", "cluster")
+      ) %>%
+      left_join(
+        pareto_results$df_caov_pct_all,
+        by = c("solID", "rn")
+      )
     OutputCollect$mediaVecCollect <- left_join(
       OutputCollect$mediaVecCollect,
       select(clusterCollect$data, .data$solID, .data$cluster, .data$top_sol),

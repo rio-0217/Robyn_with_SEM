@@ -1,10 +1,10 @@
 # install.packages("remotes") # Install remotes first if you haven't already
-remotes::install_github("facebookexperimental/Robyn/R")
+# remotes::install_github("facebookexperimental/Robyn/R")
 library(Robyn)
-# install.packages("dplyr")
-library(dplyr)
-# install.packages("tidyverse")
-library(tidyverse)
+# # install.packages("dplyr")
+# library(dplyr)
+# # install.packages("tidyverse")
+# library(tidyverse)
 # install.packages("glmnet")
 # library(regsem)
 
@@ -18,7 +18,7 @@ options(future.fork.enable = TRUE)
 
 ## Must install the python library Nevergrad once
 
-install.packages("reticulate") # Install reticulate first if you haven't already
+# install.packages("reticulate") # Install reticulate first if you haven't already
 library("reticulate") # Load the library
 
 # ## Option 1: nevergrad installation via PIP (no additional installs)
@@ -28,11 +28,17 @@ py_install("nevergrad", pip = TRUE)
 py_install("semopy", pip = TRUE)
 py_install("pandas", pip = TRUE)
 py_install("numpy", pip = TRUE)
-py_config() # Check your python version and configurations
+py_install("graphviz", pip = TRUE)
+py_install("pydot", pip = TRUE)
+# py_config() # Check your python version and configurations
 # In case nevergrad still can't be installed,
 Sys.setenv(RETICULATE_PYTHON = "~/.virtualenvs/r-reticulate/bin/python")
 # Reset your R session and re-install Nevergrad with option 1
 
+# install.packages("dplyr")
+library(dplyr)
+# install.packages("tidyverse")
+library(tidyverse)
 ## Option 2: nevergrad installation via conda (must have conda installed)
 # conda_create("r-reticulate", "Python 3.9") # Only works with <= Python 3.9 sofar
 # use_condaenv("r-reticulate")
@@ -57,7 +63,7 @@ data("dt_prophet_holidays")
 head(dt_prophet_holidays)
 
 # Directory where you want to export results to (will create new folders)
-robyn_object <- "~/Desktop"
+robyn_object <- "~/Desktop/robyn_poc"
 
 InputCollect <- robyn_inputs(
   dt_input = dt_simulated_weekly,
@@ -102,16 +108,16 @@ hyperparameters <- list(
 
 InputCollect <- robyn_inputs(InputCollect = InputCollect, hyperparameters = hyperparameters)
 
-source("./Robyn/R/R/auxiliary.R")
-source("./Robyn/R/R/checks.R")
-source("./Robyn/R/R/convergence.R")
-source("./Robyn/R/R/imports.R")
-source("./Robyn/R/R/exports.R")
-source("./Robyn/R/R/json.R")
-source("./Robyn/R/R/refresh.R")
-source("./Robyn/R/R/response.R")
-source("./Robyn/R/R/transformation.R")
-source("./Robyn/R/R/zzz.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/auxiliary.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/checks.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/convergence.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/imports.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/exports.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/json.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/refresh.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/response.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/transformation.R")
+source("./Robyn_with_SEM/SEMRobyn/R/R/zzz.R")
 library(dplyr)
 library(doParallel)
 library(doRNG)
@@ -134,37 +140,41 @@ library(lubridate)
 library(ggridges)
 
 
-# model <- '
-#   # measurement model
-#     interest =~ facebook_S + search_S
-#     awareness =~ tv_S + ooh_S + print_S
-#   # regressions
-#     dep_var ~ interest + awareness + competitor_sales_B + newsletter
-#   # residual correlations
-#     search_S ~~ facebook_S + tv_S + ooh_S + print_S
-#     tv_S ~~ print_S
-# '
-
 model <- '
+  # measurement model
+    interest =~ dep_var
+    awareness =~ dep_var
+    
   # regressions
-    dep_var ~ facebook_S + search_S + tv_S + ooh_S + print_S + competitor_sales_B + newsletter
+    interest ~ facebook_S + search_S
+    awareness ~ tv_S + ooh_S + print_S + newsletter
+    dep_var ~ competitor_sales_B
+    dep_var ~ holiday
+    dep_var ~ season
+    dep_var ~ trend
+    
   # residual correlations
-    facebook_S ~~ tv_S + ooh_S + print_S
-    search_S ~~ facebook_S + tv_S + ooh_S + print_S
-    print_S ~~ ooh_S
+    search_S ~~ facebook_S
+    tv_S ~~ ooh_S
+    tv_S ~~ print_S
+    tv_S ~~ newsletter
+    ooh_S ~~ print_S
+    ooh_S ~~ newsletter
+    print_S ~~ newsletter
 '
 
-source("./Robyn/R/R/model.R")
-source_python("./Robyn/R/R/sem_model.py")
+source("./Robyn_with_SEM/SEMRobyn/R/R/model_v2.R")
+source_python("./Robyn_with_SEM/SEMRobyn/R/R/sem_model.py")
 OutputModels <- robyn_run(
   InputCollect = InputCollect, # feed in all model specification
-  cores = 8, # default to max available
+  # cores = 4, # default to max available
   # add_penalty_factor = FALSE, # Untested feature. Use with caution.
   iterations = 2000,# recommended for the dummy dataset with no calibration
   trials = 5, # 5 recommended for the dummy dataset
   outputs = FALSE, # outputs = FALSE disables direct model output - robyn_outputs()
   use_SEM = TRUE,#TRUE,
-  SEM_mod = model
+  SEM_mod = model,
+  robyn_object = "./semplot"
 )
 
 ## Check MOO (multi-objective optimization) convergence plots
@@ -183,7 +193,7 @@ OutputCollect <- robyn_outputs(
   export = TRUE # this will create files locally
 )
 
-select_model <- "4_11_6"
+select_model <- "1_170_2"
 # Run ?robyn_allocator to check parameter definition
 # Run the "max_historical_response" scenario: "What's the revenue lift potential with the
 # same historical spend level and what is the spend mix?"

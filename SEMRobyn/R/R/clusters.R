@@ -186,14 +186,6 @@ confidence_calcs <- function(xDecompAgg, cls, all_paid, dep_var_type, k, boot_n 
         ci_low <- ifelse(boot_res$ci[1] < 0, 0, boot_res$ci[1])
         ci_up <- boot_res$ci[2]
 
-        ## Experiment with gamma distribution fitting
-        # mod_gamma <- nloptr(x0 = c(1, 1), eval_f = gamma_mle, lb = c(0,0),
-        #                     x = unlist(df_chn$roi_total),
-        #                     opts = list(algorithm = "NLOPT_LN_SBPLX", maxeval = 1e5))
-        # gamma_params <- mod_gamma$solution
-        # g_low = qgamma(0.025, shape=gamma_params[[1]], scale= gamma_params[[2]])
-        # g_up = qgamma(0.975, shape=gamma_params[[1]], scale= gamma_params[[2]])
-
         # Collect loop results
         chn_collect[[i]] <- df_chn %>%
           mutate(
@@ -259,6 +251,11 @@ errors_scores <- function(df, balance = rep(1, 3)) {
   balance <- balance / sum(balance)
   scores <- df %>%
     select(all_of(error_cols)) %>%
+    mutate(
+      nrmse = ifelse(is.infinite(.data$nrmse), max(is.finite(.data$nrmse)), .data$nrmse),
+      decomp.rssd = ifelse(is.infinite(.data$decomp.rssd), max(is.finite(.data$decomp.rssd)), .data$decomp.rssd),
+      mape = ifelse(is.infinite(.data$mape), max(is.finite(.data$mape)), .data$mape)
+    ) %>%
     # Force normalized values so they can be comparable
     mutate(
       nrmse_n = .min_max_norm(.data$nrmse),
@@ -277,13 +274,6 @@ errors_scores <- function(df, balance = rep(1, 3)) {
     pull(.data$error_score)
   return(scores)
 }
-
-# gamma_mle <- function(params, x) {
-#   gamma_shape <- params[[1]]
-#   gamma_scale <- params[[2]]
-#   # Negative log-likelihood
-#   return(-sum(dgamma(x, shape = gamma_shape, scale = gamma_scale, log = TRUE)))
-# }
 
 # ROIs data.frame for clustering (from xDecompAgg or pareto_aggregated.csv)
 .prepare_df <- function(x, all_media, dep_var_type) {

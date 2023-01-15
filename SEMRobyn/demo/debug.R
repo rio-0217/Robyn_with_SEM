@@ -47,6 +47,8 @@ trials = 1
 intercept_sign = "non_negative"
 nevergrad_algo = "TwoPointsDE"
 json_file = NULL
+ts_validation = TRUE
+
 
 ## debug robyn_train
 args(robyn_train)
@@ -70,10 +72,23 @@ lambda_control = 1
 refresh = FALSE
 seed = 123L
 quiet = FALSE
+trial = 1
 
 ## debug model_decomp
 coefs = mod_out$coefs
 y_pred = mod_out$y_pred
+
+## debug robyn_calibrate
+# calibration_input = calibration_input
+df_raw = dt_mod
+#hypParamSam = hypParamSam
+wind_start = rollingWindowStartWhich
+wind_end = rollingWindowEndWhich
+dayInterval = InputCollect$dayInterval
+dt_modAdstocked = dt_modAdstocked
+#adstock = adstock
+xDecompVec = decompCollect$xDecompVec
+coefs = decompCollect$coefsOutCat
 
 
 ## debug robyn_outputs
@@ -125,12 +140,12 @@ dt_coef = xDecompAggPar
 
 ## debug robyn_refresh
 args(robyn_refresh)
-# robyn_object
+robyn_object = NULL
 # json_file
 # robyn_object
 dt_input = dt_simulated_weekly
 dt_holidays = dt_prophet_holidays
-refresh_steps = 13
+refresh_steps = 3
 refresh_mode = "manual" # "auto", "manual"
 refresh_iters = 100
 refresh_trials = 2

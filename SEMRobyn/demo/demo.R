@@ -4,7 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 #############################################################################################
-####################         Facebook MMM Open Source - Robyn 3.8.1    ######################
+####################         Facebook MMM Open Source - Robyn 3.9.0    ######################
 ####################                    Quick guide                   #######################
 #############################################################################################
 
@@ -22,45 +22,15 @@ library(Robyn)
 # Please, check if you have installed the latest version before running this demo. Update if not
 # https://github.com/facebookexperimental/Robyn/blob/main/R/DESCRIPTION#L4
 packageVersion("Robyn")
+# Also, if you're using an older version than the latest dev version, please check older demo.R with
+# https://github.com/facebookexperimental/Robyn/blob/vX.X.X/demo/demo.R
 
 ## Force multicore when using RStudio
 Sys.setenv(R_FUTURE_FORK_ENABLE = "true")
 options(future.fork.enable = TRUE)
 
-## Must install the python library Nevergrad once
-## ATTENTION: The latest Python 3.10 version may cause Nevergrad installation error
-## See here for more info about installing Python packages via reticulate
-## https://rstudio.github.io/reticulate/articles/python_packages.html
-
-# install.packages("reticulate") # Install reticulate first if you haven't already
-# library("reticulate") # Load the library
-## Option 1: nevergrad installation via PIP (no additional installs)
-# virtualenv_create("r-reticulate")
-# use_virtualenv("r-reticulate", required = TRUE)
-# py_install("nevergrad", pip = TRUE)
-# py_config() # Check your python version and configurations
-## In case nevergrad still can't be installed,
-# Sys.setenv(RETICULATE_PYTHON = "~/.virtualenvs/r-reticulate/bin/python")
-# Reset your R session and re-install Nevergrad with option 1
-
-## Option 2: nevergrad installation via conda (must have conda installed)
-# conda_create("r-reticulate", "Python 3.9") # Only works with <= Python 3.9 sofar
-# use_condaenv("r-reticulate")
-# conda_install("r-reticulate", "nevergrad", pip=TRUE)
-# py_config() # Check your python version and configurations
-## In case nevergrad still can't be installed,
-## please locate your python file and run this line with your path:
-# use_python("~/Library/r-miniconda/envs/r-reticulate/bin/python3.9")
-# Alternatively, force Python path for reticulate with this:
-# Sys.setenv(RETICULATE_PYTHON = "~/Library/r-miniconda/envs/r-reticulate/bin/python3.9")
-# Finally, reset your R session and re-install Nevergrad with option 2
-
-#### Known potential issues when installing nevergrad and possible fixes
-# Try updating pip: system("pip3 install --upgrade pip")
-# Be sure to have numpy (and wheel, and pip?) installed: py_install("numpy", pip = TRUE)
-# Check if something looks weird on: py_config() # Py version < 3.10? No numpy?
-# Check this issue for more ideas to debug your reticulate/nevergrad issues:
-# https://github.com/facebookexperimental/Robyn/issues/189
+## ATTENTION: Must install the python library Nevergrad once before using Robyn.
+## Guide: https://github.com/facebookexperimental/Robyn/blob/main/demo/install_nevergrad.R
 
 ################################################################
 #### Step 1: Load data
@@ -106,8 +76,8 @@ InputCollect <- robyn_inputs(
   # impressions, GRP etc. If not applicable, use spend instead.
   organic_vars = "newsletter", # marketing activity without media spend
   # factor_vars = c("events"), # force variables in context_vars or organic_vars to be categorical
-  window_start = "2016-11-21",
-  window_end = "2018-08-20",
+  window_start = "2016-01-01",
+  window_end = "2018-12-31",
   adstock = "geometric" # geometric, weibull_cdf or weibull_pdf.
 )
 print(InputCollect)
@@ -124,16 +94,23 @@ hyper_names(adstock = InputCollect$adstock, all_media = InputCollect$all_media)
 
 ## Guide to setup & understand hyperparameters
 
-## 1. IMPORTANT: set plot = TRUE to see helper plots of hyperparameter's effect in transformation
+## Robyn's hyperparameters have four components:
+## Adstock parameters (theta or shape/scale).
+## Saturation parameters (alpha/gamma).
+## Regularisation parameter (lambda). No need to specify manually.
+## Time series validation parameter (train_size).
+
+## 1. IMPORTANT: set plot = TRUE to create example plots for adstock & saturation
+## hyperparameters and their influence in curve transformation
 plot_adstock(plot = FALSE)
 plot_saturation(plot = FALSE)
 
 ## 2. Get correct hyperparameter names:
 # All variables in paid_media_spends and organic_vars require hyperparameter and will be
 # transformed by adstock & saturation.
-# Run hyper_names() as above to get correct media hyperparameter names. All names in
-# hyperparameters must equal names from hyper_names(), case sensitive.
-# Run ?hyper_names to check parameter definition.
+# Run hyper_names(adstock = InputCollect$adstock, all_media = InputCollect$all_media)
+# to get correct media hyperparameter names. All names in hyperparameters must equal
+# names from hyper_names(), case sensitive. Run ?hyper_names to check fucntion arguments
 
 ## 3. Hyperparameter interpretation & recommendation:
 
@@ -145,9 +122,10 @@ plot_saturation(plot = FALSE)
 ## Weibull CDF adstock: The Cumulative Distribution Function of Weibull has two parameters
 # , shape & scale, and has flexible decay rate, compared to Geometric adstock with fixed
 # decay rate. The shape parameter controls the shape of the decay curve. Recommended
-# bound is c(0.0001, 2). The larger the shape, the more S-shape. The smaller, the more
+# bound is c(0, 2). The larger the shape, the more S-shape. The smaller, the more
 # L-shape. Scale controls the inflexion point of the decay curve. We recommend very
 # conservative bounce of c(0, 0.1), because scale increases the adstock half-life greatly.
+# When shape or scale is 0, adstock will be 0.
 
 ## Weibull PDF adstock: The Probability Density Function of the Weibull also has two
 # parameters, shape & scale, and also has flexible decay rate as Weibull CDF. The
@@ -164,7 +142,7 @@ plot_saturation(plot = FALSE)
 # c(2.0001, 10) as bound for shape. In all cases, we recommend conservative bound of
 # c(0, 0.1) for scale. Due to the great flexibility of Weibull PDF, meaning more freedom
 # in hyperparameter spaces for Nevergrad to explore, it also requires larger iterations
-# to converge.
+# to converge. When shape or scale is 0, adstock will be 0.
 
 ## Hill function for saturation: Hill function is a two-parametric function in Robyn with
 # alpha and gamma. Alpha controls the shape of the curve between exponential and s-shape.
@@ -172,13 +150,23 @@ plot_saturation(plot = FALSE)
 # more C-shape. Gamma controls the inflexion point. Recommended bounce is c(0.3, 1). The
 # larger the gamma, the later the inflection point in the response curve.
 
+## Regularization for ridge regression: Lambda is the penalty term for regularised regression.
+# Lambda doesn't need manual definition from the users, because it is set to the range of
+# c(0, 1) by default in hyperparameters and will be scaled to the proper altitude with
+# lambda_max and lambda_min_ratio.
+
+## Time series validation: When ts_validation = TRUE in robyn_run(), train_size defines the
+# percentage of data used for training, validation and out-of-sample testing. For example,
+# when train_size = 0.7, val_size and test_size will be 0.15 each. This hyperparameter is
+# customizable with default range of c(0.5, 0.8) and must be between c(0.1, 1).
+
 ## 4. Set individual hyperparameter bounds. They either contain two values e.g. c(0, 0.5),
 # or only one value, in which case you'd "fix" that hyperparameter.
 
 # Run hyper_limits() to check maximum upper and lower bounds by range
 # Example hyperparameters ranges for Geometric adstock
 hyperparameters <- list(
-  facebook_S_alphas = c(0.5),
+  facebook_S_alphas = c(0.5, 3),
   facebook_S_gammas = c(0.3, 1),
   facebook_S_thetas = c(0, 0.3),
   print_S_alphas = c(0.5, 3),
@@ -195,19 +183,20 @@ hyperparameters <- list(
   ooh_S_thetas = c(0.1, 0.4),
   newsletter_alphas = c(0.5, 3),
   newsletter_gammas = c(0.3, 1),
-  newsletter_thetas = c(0.1, 0.4)
+  newsletter_thetas = c(0.1, 0.4),
+  train_size = c(0.5, 0.8)
 )
 
 # Example hyperparameters ranges for Weibull CDF adstock
 # facebook_S_alphas = c(0.5, 3)
 # facebook_S_gammas = c(0.3, 1)
-# facebook_S_shapes = c(0.0001, 2)
+# facebook_S_shapes = c(0, 2)
 # facebook_S_scales = c(0, 0.1)
 
 # Example hyperparameters ranges for Weibull PDF adstock
 # facebook_S_alphas = c(0.5, 3
 # facebook_S_gammas = c(0.3, 1)
-# facebook_S_shapes = c(0.0001, 10)
+# facebook_S_shapes = c(0, 10)
 # facebook_S_scales = c(0, 0.1)
 
 #### 2a-3: Third, add hyperparameters into robyn_inputs()
@@ -291,8 +280,7 @@ print(InputCollect)
 
 #### Check spend exposure fit if available
 if (length(InputCollect$exposure_vars) > 0) {
-  InputCollect$modNLS$plots$facebook_I
-  InputCollect$modNLS$plots$search_clicks_P
+  lapply(InputCollect$modNLS$plots, plot)
 }
 
 ##### Manually save and import InputCollect as JSON file
@@ -308,23 +296,28 @@ if (length(InputCollect$exposure_vars) > 0) {
 ## Run all trials and iterations. Use ?robyn_run to check parameter definition
 OutputModels <- robyn_run(
   InputCollect = InputCollect, # feed in all model specification
-  # cores = NULL, # default to max available
-  # add_penalty_factor = FALSE, # Untested feature. Use with caution.
+  cores = NULL, # NULL defaults to max available - 1
   iterations = 2000, # 2000 recommended for the dummy dataset with no calibration
   trials = 5, # 5 recommended for the dummy dataset
-  outputs = FALSE # outputs = FALSE disables direct model output - robyn_outputs()
+  ts_validation = FALSE, # 3-way-split time series for NRMSE validation.
+  add_penalty_factor = FALSE # Experimental feature. Use with caution.
 )
 print(OutputModels)
 
 ## Check MOO (multi-objective optimization) convergence plots
+# Read more about convergence rules: ?robyn_converge
 OutputModels$convergence$moo_distrb_plot
 OutputModels$convergence$moo_cloud_plot
-# check convergence rules ?robyn_converge
 
-## Calculate Pareto optimality, cluster and export results and plots. See ?robyn_outputs
+## Check time-series validation plot (when ts_validation == TRUE)
+# Read more and replicate results: ?ts_validation
+if (OutputModels$ts_validation) OutputModels$ts_validation_plot
+
+## Calculate Pareto fronts, cluster and export results and plots. See ?robyn_outputs
 OutputCollect <- robyn_outputs(
   InputCollect, OutputModels,
-  # pareto_fronts = "auto",
+  pareto_fronts = "auto", # automatically pick how many pareto-fronts to fill min_candidates
+  # min_candidates = 100, # top pareto models for clustering. Default to 100
   # calibration_constraint = 0.1, # range c(0.01, 0.1) & default at 0.1
   csv_out = "pareto", # "pareto", "all", or NULL (for none)
   clusters = TRUE, # Set to TRUE to cluster similar models by ROAS. See ?robyn_clusters
@@ -347,7 +340,7 @@ print(OutputCollect)
 
 ## Compare all model one-pagers and select one that mostly reflects your business reality
 print(OutputCollect)
-select_model <- "1_204_5" # Pick one of the models from OutputCollect to proceed
+select_model <- "1_115_2" # Pick one of the models from OutputCollect to proceed
 
 #### Since 3.7.1: JSON export and import (faster and lighter than RDS files)
 ExportedModel <- robyn_write(InputCollect, OutputCollect, select_model)
@@ -452,7 +445,7 @@ if (TRUE) {
 
 # Provide JSON file with your InputCollect and ExportedModel specifications
 # It can be any model, initial or a refresh model
-json_file <- "~/Desktop/Robyn_202208231837_init/RobynModel-1_100_6.json"
+json_file <- "~/Desktop/Robyn_202211211853_init/RobynModel-1_100_6.json"
 RobynRefresh <- robyn_refresh(
   json_file = json_file,
   dt_input = dt_simulated_weekly,
@@ -472,9 +465,10 @@ RobynRefresh <- robyn_refresh(
   refresh_trials = 1
 )
 
-# InputCollect <- RobynRefresh$listRefresh1$InputCollect
-# OutputCollect <- RobynRefresh$listRefresh1$OutputCollect
-# select_model <- RobynRefresh$listRefresh1$OutputCollect$selectID
+# Continue with refreshed new InputCollect, OutputCollect, select_model values
+InputCollectX <- RobynRefresh$listRefresh1$InputCollect
+OutputCollectX <- RobynRefresh$listRefresh1$OutputCollect
+select_modelX <- RobynRefresh$listRefresh1$OutputCollect$selectID
 
 ###### DEPRECATED (<3.7.1) (might work)
 # # Run ?robyn_refresh to check parameter definition
@@ -637,7 +631,7 @@ myModel <- robyn_write(InputCollectX, OutputCollectX, dir = "~/Desktop")
 print(myModel)
 
 # Re-create one-pager
-myModelPlot <- robyn_onepagers(InputCollectX, OutputCollectX, export = FALSE)
+myModelPlot <- robyn_onepagers(InputCollectX, OutputCollectX, select_model = NULL, export = FALSE)
 # myModelPlot$`1_204_5`$patches$plots[[6]]
 
 # Refresh any imported model

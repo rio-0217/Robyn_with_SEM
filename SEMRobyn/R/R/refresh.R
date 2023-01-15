@@ -112,7 +112,6 @@ robyn_refresh <- function(json_file = NULL,
                           ...) {
   refreshControl <- TRUE
   while (refreshControl) {
-
     ## Check for NA values
     check_nas(dt_input)
     check_nas(dt_holidays)
@@ -207,16 +206,12 @@ robyn_refresh <- function(json_file = NULL,
 
     ## Refresh rolling window
     if (TRUE) {
-      totalDates <- as.Date(dt_input[, InputCollectRF$date_var][[1]])
-      refreshStart <- as.Date(InputCollectRF$window_start) + InputCollectRF$dayInterval * refresh_steps
-      refreshEnd <- as.Date(InputCollectRF$window_end) + InputCollectRF$dayInterval * refresh_steps
       InputCollectRF$refreshAddedStart <- as.Date(InputCollectRF$window_end) + InputCollectRF$dayInterval
-      InputCollectRF$window_start <- refreshStart
-      InputCollectRF$window_end <- refreshEnd
-      refreshStartWhich <- which.min(abs(difftime(totalDates, as.Date(refreshStart), units = "days")))
-      refreshEndWhich <- which.min(abs(difftime(totalDates, as.Date(refreshEnd), units = "days")))
-      InputCollectRF$rollingWindowStartWhich <- refreshStartWhich
-      InputCollectRF$rollingWindowEndWhich <- refreshEndWhich
+      totalDates <- as.Date(dt_input[, InputCollectRF$date_var][[1]])
+      refreshStart <- InputCollectRF$window_start <- as.Date(InputCollectRF$window_start) + InputCollectRF$dayInterval * refresh_steps
+      refreshStartWhich <- InputCollectRF$rollingWindowStartWhich <- which.min(abs(difftime(totalDates, refreshStart, units = "days")))
+      refreshEnd <- InputCollectRF$window_end <- as.Date(InputCollectRF$window_end) + InputCollectRF$dayInterval * refresh_steps
+      refreshEndWhich <- InputCollectRF$rollingWindowEndWhich <- which.min(abs(difftime(totalDates, refreshEnd, units = "days")))
       InputCollectRF$rollingWindowLength <- refreshEndWhich - refreshStartWhich + 1
     }
 
@@ -246,8 +241,10 @@ robyn_refresh <- function(json_file = NULL,
     if (!is.null(calibration_input)) {
       calibration_input <- bind_rows(
         InputCollectRF$calibration_input %>%
-          mutate(liftStartDate = as.Date(.data$liftStartDate),
-                 liftEndDate = as.Date(.data$liftEndDate)), calibration_input
+          mutate(
+            liftStartDate = as.Date(.data$liftStartDate),
+            liftEndDate = as.Date(.data$liftEndDate)
+          ), calibration_input
       ) %>% distinct()
       ## Check calibration data
       calibration_input <- check_calibration(
@@ -278,7 +275,7 @@ robyn_refresh <- function(json_file = NULL,
 
     ## Refresh model with adjusted decomp.rssd
     # OutputCollectRF <- Robyn$listRefresh1$OutputCollect
-    if (is.null(InputCollectRF$calibration_input)){
+    if (is.null(InputCollectRF$calibration_input)) {
       rf_cal_constr <- listOutputPrev[["calibration_constraint"]]
     } else {
       rf_cal_constr <- 1

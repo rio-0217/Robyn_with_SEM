@@ -20,9 +20,9 @@
 #' @author Bernardo Lares (bernardolares@@meta.com)
 #' @importFrom doRNG %dorng%
 #' @importFrom doParallel registerDoParallel stopImplicitCluster
-#' @importFrom dplyr any_of arrange as_tibble bind_rows contains desc distinct everything filter
+#' @importFrom dplyr across any_of arrange as_tibble bind_rows contains desc distinct everything filter
 #' group_by lag left_join mutate n pull rename row_number select slice summarise summarise_all ungroup
-#' all_of bind_cols mutate_at tally n_distinct
+#' all_of bind_cols mutate_at starts_with ends_with tally n_distinct
 #' @importFrom foreach foreach %dopar% getDoParWorkers registerDoSEQ
 #' @import ggplot2
 #' @importFrom ggridges geom_density_ridges geom_density_ridges_gradient
@@ -35,7 +35,7 @@
 #' @importFrom nloptr nloptr
 #' @importFrom parallel detectCores
 #' @importFrom patchwork guide_area plot_layout plot_annotation wrap_plots
-#' @importFrom prophet add_regressor fit.prophet prophet
+#' @importFrom prophet add_regressor add_seasonality fit.prophet prophet
 #' @importFrom reticulate tuple use_condaenv import conda_create conda_install py_module_available
 #' virtualenv_create py_install use_virtualenv
 #' @importFrom rPref low psel

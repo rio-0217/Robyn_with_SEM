@@ -33,7 +33,6 @@ robyn_write <- function(InputCollect,
                         dir = OutputCollect$plot_folder,
                         export = TRUE,
                         quiet = FALSE, ...) {
-
   # Checks
   stopifnot(inherits(InputCollect, "robyn_inputs"))
   if (!is.null(OutputCollect)) {
@@ -52,10 +51,11 @@ robyn_write <- function(InputCollect,
   ret[["InputCollect"]] <- inputs <- InputCollect[-skip]
   # toJSON(inputs, pretty = TRUE)
 
-  # ExportedModel JSON (improve)
+  # ExportedModel JSON
   if (!is.null(OutputCollect)) {
     outputs <- list()
     outputs$select_model <- select_model
+    outputs$ts_validation <- OutputCollect$OutputModels$ts_validation
     outputs$summary <- filter(OutputCollect$xDecompAgg, .data$solID == select_model) %>%
       mutate(
         metric = ifelse(InputCollect$dep_var_type == "revenue", "ROI", "CPA"),
@@ -68,11 +68,10 @@ robyn_write <- function(InputCollect,
         contains("boot_mean"), contains("ci_")
       )
     outputs$errors <- filter(OutputCollect$resultHypParam, .data$solID == select_model) %>%
-      select(.data$rsq_train, .data$nrmse, .data$decomp.rssd, .data$mape)
-    hyps_name <- c("thetas", "shapes", "scales", "alphas", "gammas")
+      select(starts_with("rsq_"), starts_with("nrmse"), .data$decomp.rssd, .data$mape)
     outputs$hyper_values <- OutputCollect$resultHypParam %>%
       filter(.data$solID == select_model) %>%
-      select(contains(hyps_name), .data$lambda) %>%
+      select(contains(hyps_name), dplyr::ends_with("_penalty"), any_of(other_hyps)) %>%
       select(order(colnames(.))) %>%
       as.list()
     outputs$hyper_updated <- OutputCollect$hyper_updated
@@ -103,24 +102,31 @@ robyn_write <- function(InputCollect,
 #' @param x \code{robyn_read()} or \code{robyn_write()} output.
 #' @export
 print.robyn_write <- function(x, ...) {
+  val <- isTRUE(x$ExportedModel$ts_validation)
   print(glued(
     "
    Exported directory: {x$ExportedModel$plot_folder}
    Exported model: {x$ExportedModel$select_model}
-   Window: {start} to {end} ({periods} {type}s)",
+   Window: {start} to {end} ({periods} {type}s)
+   Time Series Validation: {val} (train size = {val_detail})",
     start = x$InputCollect$window_start,
     end = x$InputCollect$window_end,
     periods = x$InputCollect$rollingWindowLength,
-    type = x$InputCollect$intervalType
+    type = x$InputCollect$intervalType,
+    val_detail = formatNum(100 * x$ExportedModel$hyper_values$train_size, 2, pos = "%")
   ))
-
+  errors <- x$ExportedModel$errors
   print(glued(
     "\n\nModel's Performance and Errors:\n    {errors}",
     errors = paste(
-      "R2 (train):", signif(x$ExportedModel$errors$rsq_train, 4),
-      "| NRMSE =", signif(x$ExportedModel$errors$nrmse, 4),
-      "| DECOMP.RSSD =", signif(x$ExportedModel$errors$decomp.rssd, 4),
-      "| MAPE =", signif(x$ExportedModel$errors$mape, 4)
+      sprintf(
+        "Adj.R2 (%s): %s",
+        ifelse(!val, "train", "test"),
+        ifelse(!val, signif(errors$rsq_train, 4), signif(errors$rsq_test, 4))
+      ),
+      "| NRMSE =", signif(errors$nrmse, 4),
+      "| DECOMP.RSSD =", signif(errors$decomp.rssd, 4),
+      "| MAPE =", signif(errors$mape, 4)
     )
   ))
 
@@ -128,20 +134,20 @@ print.robyn_write <- function(x, ...) {
 
   print(x$ExportedModel$summary %>%
     select(-contains("boot"), -contains("ci_")) %>%
-    dplyr::rename_at("performance", list(~ ifelse(InputCollect$dep_var_type == "revenue", "ROI", "CPA"))) %>%
+    dplyr::rename_at("performance", list(~ ifelse(x$InputCollect$dep_var_type == "revenue", "ROI", "CPA"))) %>%
     mutate(decompPer = formatNum(100 * .data$decompPer, pos = "%")) %>%
     dplyr::mutate_if(is.numeric, function(x) formatNum(x, 4, abbr = TRUE)) %>%
     replace(., . == "NA", "-") %>% as.data.frame())
 
   print(glued(
-    "\n\nHyper-parameters for channel transformations:\n    Adstock: {x$InputCollect$adstock}"
+    "\n\nHyper-parameters:\n    Adstock: {x$InputCollect$adstock}"
   ))
 
   # Nice and tidy table format for hyper-parameters
-  hyps_name <- c("thetas", "shapes", "scales", "alphas", "gammas")
+  hyps_name <- c(hyps_name, "penalty")
   regex <- paste(paste0("_", hyps_name), collapse = "|")
   hyper_df <- as.data.frame(x$ExportedModel$hyper_values) %>%
-    select(-contains("lambda")) %>%
+    select(-contains("lambda"), -any_of(other_hyps)) %>%
     tidyr::gather() %>%
     tidyr::separate(.data$key,
       into = c("channel", "none"),
@@ -221,7 +227,7 @@ Adstock: {a$adstock}
       "None"
     },
     hyps = glued(
-      "Hyper-parameters for channel transformations:\n{flatten_hyps(a$hyperparameters)}"
+      "Hyper-parameters ranges:\n{flatten_hyps(a$hyperparameters)}"
     )
   ))
 
@@ -283,7 +289,8 @@ robyn_chain <- function(json_file) {
   json_files <- paste0(dirs, "RobynModel-", names(dirs), ".json")
   attr(chainData, "json_files") <- json_files
   attr(chainData, "chain") <- ids # names(chainData)
-  if (length(ids) != length(names(chainData)))
+  if (length(ids) != length(names(chainData))) {
     warning("Can't replicate chain-like results if you don't follow Robyn's chain structure")
+  }
   return(invisible(chainData))
 }
